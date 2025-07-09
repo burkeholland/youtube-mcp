@@ -19,7 +19,15 @@ export const metadata = {
 };
 
 export default async function get_video_info({ videoId, includeComments }: InferSchema<typeof schema>) {
-  const yt = await Innertube.create({ generate_session_locally: true });
+  // Set a realistic user agent and optionally a cookie from env for Vercel/serverless
+  const userAgent = process.env.YT_USER_AGENT ||
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+  const cookie = process.env.YT_COOKIE;
+  const yt = await Innertube.create({
+    generate_session_locally: true,
+    user_agent: userAgent,
+    ...(cookie ? { cookie } : {})
+  });
   const info = await yt.getInfo(videoId);
 
   const videoData: any = {
