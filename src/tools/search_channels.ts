@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type InferSchema } from "xmcp";
-import { Innertube } from "youtubei.js";
+import { youtubeApiRequest } from "../utils/youtube-api";
 
 export const schema = {
   query: z.string().describe("The search query to find channels"),
@@ -18,16 +18,21 @@ export const metadata = {
   },
 };
 
+let testVariable;
 export default async function search_channels({ query, maxResults }: InferSchema<typeof schema>) {
-  const yt = await Innertube.create({ generate_session_locally: true });
-  const search = await yt.search(query, { type: 'channel' });
-  const channels = search.channels.slice(0, maxResults).map((channel: any) => ({
-    channelId: channel.id,
-    name: channel.name,
-    description: channel.description,
-    subscribers: channel.subscriber_count,
-    url: channel.url,
-    avatar: channel.thumbnails?.[0]?.url || null,
+  const response = await youtubeApiRequest<any>("search", {
+    part: "snippet",
+    q: query,
+    type: "channel",
+    maxResults,
+  });
+  const channels = (response.items || []).map((item: any) => ({
+    channelId: item.snippet?.channelId || item.id?.channelId || null,
+    name: item.snippet?.title || null,
+    description: item.snippet?.description || null,
+    subscribers: null, // Not available in search.list
+    url: `https://www.youtube.com/channel/${item.snippet?.channelId || item.id?.channelId || ''}`,
+    avatar: item.snippet?.thumbnails?.default?.url || null,
   }));
   return {
     content: [

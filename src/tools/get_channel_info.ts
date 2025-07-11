@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { type InferSchema } from "xmcp";
-import { Innertube } from "youtubei.js";
+import { withCache } from "../utils/youtube-client";
+import { youtubeApiRequest } from "../utils/youtube-api";
 
 export const schema = {
   channelId: z.string().describe("YouTube channel ID"),
@@ -18,24 +19,66 @@ export const metadata = {
 };
 
 export default async function get_channel_info({ channelId }: InferSchema<typeof schema>) {
-  const yt = await Innertube.create({ generate_session_locally: true });
-  const channel = await yt.getChannel(channelId);
-  const meta = channel.metadata || {};
-  const info = {
-    channelId: meta.external_id || null,
-    name: channel.title || meta.title || null,
-    description: meta.description || null,
-    url: meta.url || null,
-    avatar: meta.avatar?.[0]?.url || null,
-    // banner and joinedDate not available in metadata
-    tags: meta.keywords || [],
-  };
-  return {
-    content: [
-      {
-        type: "text",
-        text: JSON.stringify(info, null, 2),
-      },
-    ],
-  };
+  try {
+    const cacheKey = `channel_info_${channelId}`;
+    
+    return await withCache(cacheKey, async () => {
+      console.error(`Getting channel info from YouTube Data API for: ${channelId}`);
+      const response = await youtubeApiRequest<any>("channels", {
+        part: "snippet,brandingSettings,statistics",
+        id: channelId,
+      });
+
+      if (!response || !response.items || response.items.length === 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify({}, null, 2),
+            },
+          ],
+        };
+      }
+
+      const channel = response.items[0];
+      const snippet = channel.snippet || {};
+      const branding = channel.brandingSettings || {};
+      const info = {
+        channelId: channel.id || null,
+        name: snippet.title || null,
+        description: snippet.description || null,
+        url: `https://www.youtube.com/channel/${channel.id}`,
+        avatar: snippet.thumbnails?.default?.url || null,
+        banner: branding.image?.bannerExternalUrl || null,
+        joinedDate: snippet.publishedAt || null,
+        tags: branding.channel?.keywords ? branding.channel.keywords.split(" ") : [],
+        subscriberCount: channel.statistics?.subscriberCount || null,
+        videoCount: channel.statistics?.videoCount || null,
+        viewCount: channel.statistics?.viewCount || null,
+      };
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(info, null, 2),
+          },
+        ],
+      };
+    });
+  } catch (error: any) {
+    console.error(`Error in get_channel_info for ${channelId}:`, error);
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify({
+            error: "Failed to get channel info",
+            channelId,
+            message: error.message || String(error)
+          }, null, 2),
+        },
+      ],
+    };
+  }
 }

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type InferSchema } from "xmcp";
-import { Innertube } from "youtubei.js";
+import { youtubeApiRequest } from "../utils/youtube-api";
 
 export const schema = {
   videoId: z.string().describe("YouTube video ID"),
@@ -18,16 +18,25 @@ export const metadata = {
     idempotentHint: true,
   },
 };
-
 export default async function get_video_comments({ videoId, sortBy, maxResults }: InferSchema<typeof schema>) {
-  const yt = await Innertube.create({ generate_session_locally: true });
-  const comments = await yt.getComments(videoId, sortBy);
-  const items = comments.contents.slice(0, maxResults).map((comment: any) => ({
-    author: comment.author?.name,
-    text: comment.content?.text,
-    likeCount: comment.vote_count,
-    publishedTime: comment.published?.text,
-  }));
+  // Map sortBy to API's order param
+  const order = sortBy === "NEWEST_FIRST" ? "time" : "relevance";
+  const response = await youtubeApiRequest<any>("commentThreads", {
+    part: "snippet",
+    videoId,
+    maxResults,
+    order,
+    textFormat: "plainText",
+  });
+  const items = (response.items || []).map((item: any) => {
+    const topComment = item.snippet?.topLevelComment?.snippet || {};
+    return {
+      author: topComment.authorDisplayName,
+      text: topComment.textDisplay,
+      likeCount: topComment.likeCount,
+      publishedTime: topComment.publishedAt,
+    };
+  });
   return {
     content: [
       {

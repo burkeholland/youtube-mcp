@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { type InferSchema } from "xmcp";
-import { Innertube } from "youtubei.js";
+import { youtubeApiRequest } from "../utils/youtube-api";
 
 export const schema = {
   query: z.string().describe("Search query for playlists"),
@@ -17,21 +17,21 @@ export const metadata = {
     idempotentHint: true,
   },
 };
-
 export default async function search_playlists({ query, limit }: InferSchema<typeof schema>) {
-  const yt = await Innertube.create({ generate_session_locally: true });
-  const search = await yt.search(query, { type: "playlist" });
-  const playlists = search.results
-    .filter((item: any) => item.type === "playlist")
-    .slice(0, limit)
-    .map((playlist: any) => ({
-      playlistId: playlist.id,
-      title: playlist.title,
-      author: playlist.author?.name,
-      videoCount: playlist.video_count,
-      url: `https://www.youtube.com/playlist?list=${playlist.id}`,
-      thumbnails: playlist.thumbnails,
-    }));
+  const response = await youtubeApiRequest<any>("search", {
+    part: "snippet",
+    q: query,
+    type: "playlist",
+    maxResults: limit,
+  });
+  const playlists = (response.items || []).map((item: any) => ({
+    playlistId: item.id?.playlistId || null,
+    title: item.snippet?.title || null,
+    author: item.snippet?.channelTitle || null,
+    videoCount: null, // Not available in search.list
+    url: `https://www.youtube.com/playlist?list=${item.id?.playlistId || ''}`,
+    thumbnails: item.snippet?.thumbnails || null,
+  }));
   return {
     content: [
       {

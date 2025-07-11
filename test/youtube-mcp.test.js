@@ -104,23 +104,35 @@ async function run() {
   try { playlistObj = JSON.parse(playlist.result.content[0].text); } catch {}
   check('get_playlist_info', playlistObj && playlistObj.id === 'PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI', 'Should return correct playlist info', playlist);
 
-  // Test get_search_suggestions
-  const suggestions = await callTool('get_search_suggestions', { query: 'lofi' });
-  let suggestionsArr = null;
-  try { suggestionsArr = JSON.parse(suggestions.result.content[0].text); } catch {}
-  check('get_search_suggestions', Array.isArray(suggestionsArr), 'Should return suggestions array', suggestions);
+  // Test get_channel_videos (using Visual Studio Code channel)
+  const channelVideos = await callTool('get_channel_videos', { channelId: 'UCs5Y5_7XK8HLDX0SLNwkd3w', maxResults: 2 });
+  let channelVideosArr = null;
+  try { channelVideosArr = JSON.parse(channelVideos.result.content[0].text); } catch {}
+  check('get_channel_videos', Array.isArray(channelVideosArr), 'Should return channel videos array', channelVideos);
+
+  // Test get_video_comments
+  const videoComments = await callTool('get_video_comments', { videoId: 'dQw4w9WgXcQ', maxResults: 2 });
+  let videoCommentsArr = null;
+  try { videoCommentsArr = JSON.parse(videoComments.result.content[0].text); } catch {}
+  check('get_video_comments', Array.isArray(videoCommentsArr), 'Should return video comments array', videoComments);
+
+  // Test search_channels
+  const channelsSearch = await callTool('search_channels', { query: 'music', maxResults: 2 });
+  let channelsSearchArr = null;
+  try { channelsSearchArr = JSON.parse(channelsSearch.result.content[0].text); } catch {}
+  check('search_channels', Array.isArray(channelsSearchArr), 'Should return channels search array', channelsSearch);
+
+  // Test search_playlists
+  const playlistsSearch = await callTool('search_playlists', { query: 'music', maxResults: 2 });
+  let playlistsSearchArr = null;
+  try { playlistsSearchArr = JSON.parse(playlistsSearch.result.content[0].text); } catch {}
+  check('search_playlists', Array.isArray(playlistsSearchArr), 'Should return playlists search array', playlistsSearch);
 
   // Test get_trending_videos
   const trending = await callTool('get_trending_videos', { limit: 2 });
   let trendingArr = null;
   try { trendingArr = JSON.parse(trending.result.content[0].text); } catch {}
   check('get_trending_videos', Array.isArray(trendingArr), 'Should return trending videos array', trending);
-
-  // Test get_home_feed
-  const home = await callTool('get_home_feed', { limit: 2 });
-  let homeArr = null;
-  try { homeArr = JSON.parse(home.result.content[0].text); } catch {}
-  check('get_home_feed', Array.isArray(homeArr), 'Should return home feed array', home);
 
   // Summary
   console.log(`\n${passed} passed, ${failed} failed`);

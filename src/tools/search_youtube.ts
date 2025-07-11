@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { type InferSchema } from "xmcp";
-import { Innertube } from "youtubei.js";
+import { withCache } from "../utils/youtube-client";
+import { youtubeApiRequest } from "../utils/youtube-api";
 
 export const schema = {
   query: z.string().describe("The search query to find videos"),
@@ -20,47 +21,59 @@ export const metadata = {
 
 export default async function search_youtube({ query, maxResults }: InferSchema<typeof schema>) {
   try {
-    const yt = await Innertube.create({ generate_session_locally: true });
-    const search = await yt.search(query, { type: 'video' });
+    const cacheKey = `search_${query}_${maxResults}`;
     
-    if (!search || !search.videos) {
+    return await withCache(cacheKey, async () => {
+      console.error(`Searching YouTube Data API for: ${query}`);
+      const response = await youtubeApiRequest<any>("search", {
+        part: "snippet",
+        q: query,
+        type: "video",
+        maxResults,
+      });
+
+      if (!response || !response.items) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify([], null, 2),
+            },
+          ],
+        };
+      }
+
+      const videos = response.items.map((item: any) => {
+        return {
+          videoId: item.id?.videoId || 'unknown',
+          title: item.snippet?.title || 'Unknown',
+          channel: item.snippet?.channelTitle || 'Unknown',
+          publishedTime: item.snippet?.publishedAt || 'Unknown',
+          thumbnail: item.snippet?.thumbnails?.default?.url || '',
+          url: `https://www.youtube.com/watch?v=${item.id?.videoId || 'unknown'}`
+        };
+      });
+
       return {
         content: [
           {
             type: "text",
-            text: JSON.stringify([], null, 2),
+            text: JSON.stringify(videos, null, 2),
           },
         ],
       };
-    }
-    
-    const videos = search.videos.slice(0, maxResults).map((video: any) => {
-      return {
-        videoId: video.id || 'unknown',
-        title: String(video.title || 'Unknown'),
-        channel: String(video.author?.name || 'Unknown'),
-        duration: String(video.duration || 'Unknown'),
-        views: String(video.view_count || 'Unknown'),
-        publishedTime: String(video.published || 'Unknown'),
-        thumbnail: video.thumbnails?.[0]?.url || '',
-        url: `https://www.youtube.com/watch?v=${video.id || 'unknown'}`
-      };
     });
-    
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(videos, null, 2),
-        },
-      ],
-    };
   } catch (error: any) {
+    console.error(`Error in search_youtube for query "${query}":`, error);
     return {
       content: [
         {
           type: "text",
-          text: `Error: ${error.message || String(error)}`,
+          text: JSON.stringify({
+            error: "Failed to search YouTube",
+            query,
+            message: error.message || String(error)
+          }, null, 2),
         },
       ],
     };

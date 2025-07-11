@@ -8,16 +8,19 @@
   "scripts": {
     "build": "xmcp build",
     "dev": "xmcp dev",
-    "start": "node dist/http.js"
+    "start": "node dist/http.js",
+    "test": "node test/youtube-mcp.test.js"
   },
   "dependencies": {
+    "https-proxy-agent": "^7.0.6",
     "xmcp": "latest",
     "youtubei.js": "^14.0.0",
     "zod": "3.24.4"
   },
   "devDependencies": {
-    "swc-loader": "^0.2.6",
-    "node-fetch": "^2.6.7"
+    "@types/node-fetch": "^2.6.12",
+    "node-fetch": "^2.6.7",
+    "swc-loader": "^0.2.6"
   },
   "test": "node test/youtube-mcp.test.js"
 }
